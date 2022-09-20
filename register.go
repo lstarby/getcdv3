@@ -1,10 +1,10 @@
 package getcdv3
 
 import (
-	"Open_IM/pkg/common/log"
-	"Open_IM/pkg/utils"
 	"context"
 	"fmt"
+	log "github.com/OpenIMSDK/open_log"
+	utils "github.com/OpenIMSDK/open_utils"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"net"
 	"strconv"
@@ -32,9 +32,9 @@ func GetPrefix4Unique(schema, serviceName string) string {
 }
 
 // "%s:///%s/" ->  "%s:///%s:ip:port"
-func RegisterEtcd4Unique(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int) error {
+func RegisterEtcd4Unique(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int, operationID string) error {
 	serviceName = serviceName + ":" + net.JoinHostPort(myHost, strconv.Itoa(myPort))
-	return RegisterEtcd(schema, etcdAddr, myHost, myPort, serviceName, ttl)
+	return RegisterEtcd(schema, etcdAddr, myHost, myPort, serviceName, ttl, operationID)
 }
 
 func GetTarget(schema, myHost string, myPort int, serviceName string) string {
@@ -42,8 +42,7 @@ func GetTarget(schema, myHost string, myPort int, serviceName string) string {
 }
 
 //etcdAddr separated by commas
-func RegisterEtcd(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int) error {
-	operationID := utils.OperationIDGenerator()
+func RegisterEtcd(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int, operationID string) error {
 	args := schema + " " + etcdAddr + " " + myHost + " " + serviceName + " " + utils.Int32ToString(int32(myPort))
 	ttl = ttl * 3
 	cli, err := clientv3.New(clientv3.Config{
