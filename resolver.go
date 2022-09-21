@@ -369,7 +369,7 @@ func getConn4Unique(schema, etcdaddr, servicename string, username, password str
 
 	allConn := make([]*grpc.ClientConn, 0)
 	for _, v := range allService {
-		r := getConn(schema, etcdaddr, v, operationID, username, password)
+		r := GetConn(schema, etcdaddr, v, operationID, username, password)
 		allConn = append(allConn, r)
 	}
 
