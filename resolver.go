@@ -66,7 +66,7 @@ func (r1 *Resolver) ResolveNow(rn resolver.ResolveNowOptions) {
 func (r1 *Resolver) Close() {
 }
 
-func getConn(schema, etcdaddr, serviceName string, operationID string, username, password string) *grpc.ClientConn {
+func GetConn(schema, etcdaddr, serviceName string, operationID string, username, password string) *grpc.ClientConn {
 	rwNameResolverMutex.RLock()
 	r, ok := nameResolver[schema+serviceName]
 	rwNameResolverMutex.RUnlock()
@@ -171,7 +171,7 @@ func getConn(schema, etcdaddr, serviceName string, operationID string, username,
 //	log.NewDebug(operationID, utils.GetSelfFuncName(), serviceName, conn)
 //	return conn
 //}
-
+//
 //func GetDefaultConn(schema, etcdaddr, serviceName string, operationID string) *grpc.ClientConn {
 //	con := getConn(schema, etcdaddr, serviceName, operationID)
 //	if con != nil {
