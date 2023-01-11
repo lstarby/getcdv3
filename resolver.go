@@ -272,42 +272,39 @@ var Conn4UniqueListMtx sync.RWMutex
 var IsUpdateStart bool
 var IsUpdateStartMtx sync.RWMutex
 
-//func GetDefaultGatewayConn4Unique(schema, etcdaddr, operationID string) []*grpc.ClientConn {
-//	IsUpdateStartMtx.Lock()
-//	if IsUpdateStart == false {
-//		Conn4UniqueList = getConn4Unique(schema, etcdaddr, config.Config.RpcRegisterName.OpenImRelayName)
-//		go func() {
-//			for {
-//				select {
-//				case <-time.After(time.Second * time.Duration(30)):
-//					Conn4UniqueListMtx.Lock()
-//					Conn4UniqueList = getConn4Unique(schema, etcdaddr, config.Config.RpcRegisterName.OpenImRelayName)
-//					Conn4UniqueListMtx.Unlock()
-//				}
-//			}
-//		}()
-//	}
-//	IsUpdateStart = true
-//	IsUpdateStartMtx.Unlock()
-//
-//	Conn4UniqueListMtx.Lock()
-//	var clientConnList []*grpc.ClientConn
-//	for _, v := range Conn4UniqueList {
-//		clientConnList = append(clientConnList, v)
-//	}
-//	Conn4UniqueListMtx.Unlock()
-//
-//	//grpcConns := getConn4Unique(schema, etcdaddr, config.Config.RpcRegisterName.OpenImRelayName)
-//	grpcConns := clientConnList
-//	if len(grpcConns) > 0 {
-//		return grpcConns
-//	}
-//	log.NewWarn(operationID, utils.GetSelfFuncName(), " len(grpcConns) == 0 ", schema, etcdaddr, config.Config.RpcRegisterName.OpenImRelayName)
-//	grpcConns = GetDefaultGatewayConn4UniqueFromcfg(operationID)
-//	log.NewDebug(operationID, utils.GetSelfFuncName(), config.Config.RpcRegisterName.OpenImRelayName, grpcConns)
-//	return grpcConns
-//}
-//
+func GetDefaultGatewayConn4Unique(schema, etcdaddr, serviceName, userName, password, operationID string) []*grpc.ClientConn {
+	IsUpdateStartMtx.Lock()
+	if IsUpdateStart == false {
+		Conn4UniqueList = getConn4Unique(schema, etcdaddr, serviceName, userName, password, operationID)
+		go func() {
+			for {
+				select {
+				case <-time.After(time.Second * time.Duration(30)):
+					Conn4UniqueListMtx.Lock()
+					Conn4UniqueList = getConn4Unique(schema, etcdaddr, serviceName, userName, password, operationID)
+					Conn4UniqueListMtx.Unlock()
+				}
+			}
+		}()
+	}
+	IsUpdateStart = true
+	IsUpdateStartMtx.Unlock()
+
+	Conn4UniqueListMtx.Lock()
+	var clientConnList []*grpc.ClientConn
+	for _, v := range Conn4UniqueList {
+		clientConnList = append(clientConnList, v)
+	}
+	Conn4UniqueListMtx.Unlock()
+
+	//grpcConns := getConn4Unique(schema, etcdaddr, config.Config.RpcRegisterName.OpenImRelayName)
+	grpcConns := clientConnList
+	if len(grpcConns) > 0 {
+		return grpcConns
+	}
+	return grpcConns
+}
+
 //func GetDefaultGatewayConn4UniqueFromcfg(operationID string) []*grpc.ClientConn {
 //	rpcRegisterIP := config.Config.RpcRegisterIP
 //	var err error
