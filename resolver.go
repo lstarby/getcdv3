@@ -52,7 +52,7 @@ func NewResolver(schema, etcdAddr, serviceName string, operationID string, usern
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 	conn, err := grpc.DialContext(ctx, GetPrefix(schema, serviceName),
 		grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"LoadBalancingPolicy": "%s"}`, roundrobin.Name)),
-		grpc.WithInsecure())
+		grpc.WithInsecure(), WithRequestMateData())
 	log.Debug(operationID, "etcd key ", GetPrefix(schema, serviceName))
 	if err == nil {
 		r.grpcClientConn = conn
@@ -400,22 +400,22 @@ var (
 //
 //}
 
-//func NewPool(schema, etcdaddr, servicename string) *Pool {
+// func NewPool(schema, etcdaddr, servicename string) *Pool {
 //
-//	if _, ok := service2pool[schema+servicename]; !ok {
-//		//
-//		service2poolMu.Lock()
-//		if _, ok1 := service2pool[schema+servicename]; !ok1 {
-//			p, err := New(GetconnFactory, schema, etcdaddr, servicename, 5, 10, 1)
-//			if err == nil {
-//				service2pool[schema+servicename] = p
+//		if _, ok := service2pool[schema+servicename]; !ok {
+//			//
+//			service2poolMu.Lock()
+//			if _, ok1 := service2pool[schema+servicename]; !ok1 {
+//				p, err := New(GetconnFactory, schema, etcdaddr, servicename, 5, 10, 1)
+//				if err == nil {
+//					service2pool[schema+servicename] = p
+//				}
 //			}
+//			service2poolMu.Unlock()
 //		}
-//		service2poolMu.Unlock()
-//	}
 //
-//	return service2pool[schema+servicename]
-//}
+//		return service2pool[schema+servicename]
+//	}
 func GetGrpcConn(schema, etcdaddr, servicename string) *grpc.ClientConn {
 	return nameResolver[schema+servicename].grpcClientConn
 }
