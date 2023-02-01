@@ -6,11 +6,29 @@ import (
 	log "github.com/OpenIMSDK/open_log"
 	utils "github.com/OpenIMSDK/open_utils"
 	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc"
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+type EtcdConn struct {
+	rEtcd                                                   *RegEtcd
+	schema, serviceName, etcdAddr, host, userName, password string
+	port, ttl                                               int
+
+	// targetRpcDefaultPorts
+	nameResolver        map[string]*Resolver
+	defaultPorts        map[string][]int
+	rwNameResolverMutex sync.RWMutex
+
+	conn4UniqueList    []*grpc.ClientConn
+	conn4UniqueListMtx sync.RWMutex
+	isUpdateStart      bool
+	isUpdateStartMtx   sync.RWMutex
+}
 
 type RegEtcd struct {
 	cli    *clientv3.Client
@@ -19,41 +37,49 @@ type RegEtcd struct {
 	key    string
 }
 
-var rEtcd *RegEtcd
-
-// "%s:///%s/"
-func GetPrefix(schema, serviceName string) string {
-	return fmt.Sprintf("%s:///%s/", schema, serviceName)
-}
-
-// "%s:///%s"
-func GetPrefix4Unique(schema, serviceName string) string {
-	return fmt.Sprintf("%s:///%s", schema, serviceName)
+func NewEtcdConn(schema, etcdAddr, host, userName, password string, port, ttl int) (conn *EtcdConn, err error) {
+	if host == "" {
+		host, err = utils.GetLocalIP()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &EtcdConn{
+		schema:   schema,
+		etcdAddr: etcdAddr,
+		host:     host,
+		port:     port,
+		ttl:      ttl,
+		userName: userName,
+		password: password,
+	}, nil
 }
 
 // "%s:///%s/" ->  "%s:///%s:ip:port"
-func RegisterEtcd4Unique(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int, operationID string) error {
-	serviceName = serviceName + ":" + net.JoinHostPort(myHost, strconv.Itoa(myPort))
-	return RegisterEtcd(schema, etcdAddr, myHost, myPort, serviceName, ttl, operationID)
+func (e *EtcdConn) RegisterEtcd4Unique(operationID, serviceName string) error {
+	serviceName = serviceName + ":" + net.JoinHostPort(e.host, strconv.Itoa(e.port))
+	return e.RegisterEtcd(operationID, serviceName)
 }
 
-func GetTarget(schema, myHost string, myPort int, serviceName string) string {
-	return GetPrefix4Unique(schema, serviceName) + ":" + net.JoinHostPort(myHost, strconv.Itoa(myPort)) + "/"
+func (e *EtcdConn) GetTarget(serviceName string) string {
+	return GetPrefix4Unique(e.schema, serviceName) + ":" + net.JoinHostPort(e.host, strconv.Itoa(e.port)) + "/"
 }
 
 //etcdAddr separated by commas
-func RegisterEtcd(schema, etcdAddr, myHost string, myPort int, serviceName string, ttl int, operationID string) error {
-	args := schema + " " + etcdAddr + " " + myHost + " " + serviceName + " " + utils.Int32ToString(int32(myPort))
-	ttl = ttl * 3
+func (e *EtcdConn) RegisterEtcd(operationID, serviceName string) error {
+	e.serviceName = serviceName
+	args := e.schema + " " + e.etcdAddr + " " + e.host + " " + serviceName + " " + utils.Int32ToString(int32(e.port))
+	ttl := e.ttl * 3
 	cli, err := clientv3.New(clientv3.Config{
-		Endpoints: strings.Split(etcdAddr, ","), DialTimeout: 5 * time.Second})
+		Username:  e.userName,
+		Password:  e.password,
+		Endpoints: strings.Split(e.etcdAddr, ","), DialTimeout: 5 * time.Second})
 
 	log.Info(operationID, "RegisterEtcd args: ", args, ttl)
 	if err != nil {
 		log.Error(operationID, "clientv3.New failed ", args, ttl, err.Error())
-		return fmt.Errorf("create etcd clientv3 client failed, errmsg:%v, etcd addr:%s", err, etcdAddr)
+		return fmt.Errorf("create etcd clientv3 client failed, errmsg:%v, etcd addr:%s", err, e.etcdAddr)
 	}
-
 	//lease
 	ctx, cancel := context.WithCancel(context.Background())
 	resp, err := cli.Grant(ctx, int64(ttl))
@@ -64,8 +90,8 @@ func RegisterEtcd(schema, etcdAddr, myHost string, myPort int, serviceName strin
 	log.Info(operationID, "Grant ok, resp ID ", resp.ID)
 
 	//  schema:///serviceName/ip:port ->ip:port
-	serviceValue := net.JoinHostPort(myHost, strconv.Itoa(myPort))
-	serviceKey := GetPrefix(schema, serviceName) + serviceValue
+	serviceValue := net.JoinHostPort(e.host, strconv.Itoa(e.port))
+	serviceKey := GetPrefix(e.schema, serviceName) + serviceValue
 
 	//set key->value
 	if _, err := cli.Put(ctx, serviceKey, serviceValue, clientv3.WithLease(resp.ID)); err != nil {
@@ -112,17 +138,16 @@ func RegisterEtcd(schema, etcdAddr, myHost string, myPort int, serviceName strin
 			}
 		}
 	}()
-
-	rEtcd = &RegEtcd{ctx: ctx,
+	e.rEtcd = &RegEtcd{ctx: ctx,
 		cli:    cli,
 		cancel: cancel,
 		key:    serviceKey}
-
 	return nil
 }
 
-func UnRegisterEtcd() {
+func (e *EtcdConn) UnRegisterEtcd() error {
 	//delete
-	rEtcd.cancel()
-	rEtcd.cli.Delete(rEtcd.ctx, rEtcd.key)
+	e.rEtcd.cancel()
+	_, err := e.rEtcd.cli.Delete(e.rEtcd.ctx, e.rEtcd.key)
+	return err
 }
