@@ -113,7 +113,7 @@ func (e *EtcdConn) NewResolver(operationID string, serviceName string) (*Resolve
 	ctx, _ := context.WithTimeout(context.Background(), time.Second*5)
 	conn, err := grpc.DialContext(ctx, GetPrefix(e.schema, serviceName),
 		grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"LoadBalancingPolicy": "%s"}`, roundrobin.Name)),
-		grpc.WithInsecure())
+		grpc.WithInsecure(), WithRequestMateData())
 	if err == nil {
 		r.grpcClientConn = conn
 	}
